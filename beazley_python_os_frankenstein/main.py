@@ -17,6 +17,14 @@ class Task:
     def __lt__(self, other):
         return self.taskid < other.taskid
 
+class SystemCall:
+    def handle(self):
+        pass
+
+class GetTid(SystemCall):
+    def handle(self):
+        self.task.sendval = self.task.tid
+        self.sched.schedule(self.task)
 
 class Scheduler:
     def __init__(self):
@@ -40,10 +48,12 @@ class Scheduler:
             (task_time, task) = heapq.heappop(self.ready)
             if self.time < task_time:
                 self.time = task_time
-            print(f'popped task {task.tid} at time {task_time}')
             try:
                 result = task.run()
-                print(result)
+                if isinstance(result, SystemCall):
+                    result.task = task
+                    result.sched = self
+                    result.handle()
                 self.schedule(task)
             except StopIteration:
                 self.exit(task)
@@ -53,10 +63,14 @@ def looper(x, identifier):
     for i in range(x):
         yield i, identifier
 
+def foo():
+    my_tid = yield GetTid()
+    for i in range(5):
+        yield f'Foo just ran with tid = {my_tid}'
+
 
 sched = Scheduler()
 
-sched.new(looper(20, 'bob'))
-sched.new(looper(35, 'sandra'))
+sched.new(foo())
 
 sched.mainloop()
