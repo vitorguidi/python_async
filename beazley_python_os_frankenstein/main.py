@@ -1,7 +1,3 @@
-import heapq
-import random
-
-
 class Task:
     taskid = 0
 
@@ -14,9 +10,6 @@ class Task:
     def run(self):
         return self.target.send(self.sendval)
 
-    def __lt__(self, other):
-        return self.taskid < other.taskid
-
 class SystemCall:
     def handle(self):
         pass
@@ -24,6 +17,15 @@ class SystemCall:
 class GetTid(SystemCall):
     def handle(self):
         self.task.sendval = self.task.tid
+        self.sched.schedule(self.task)
+
+# Create a new task
+class NewTask(SystemCall):
+    def __init__(self,target):
+        self.target = target
+    def handle(self):
+        tid = self.sched.new(self.target)
+        self.task.sendval = tid
         self.sched.schedule(self.task)
 
 class Scheduler:
@@ -36,41 +38,42 @@ class Scheduler:
         newTask = Task(target)
         self.taskmap[newTask.tid] = newTask
         self.schedule(newTask)
+        return newTask.tid
 
     def schedule(self, task):
-        heapq.heappush(self.ready, (self.time + random.randrange(10), task))
+        self.ready.append(task)
 
     def exit(self, task):
         del self.taskmap[task.tid]
 
     def mainloop(self):
         while self.taskmap:
-            (task_time, task) = heapq.heappop(self.ready)
-            if self.time < task_time:
-                self.time = task_time
+            task = self.ready.pop(0)
             try:
                 result = task.run()
+                print(result)
                 if isinstance(result, SystemCall):
                     result.task = task
                     result.sched = self
                     result.handle()
+                    continue
                 self.schedule(task)
             except StopIteration:
+                print(f'exiting task {task.tid}')
                 self.exit(task)
-
-
-def looper(x, identifier):
-    for i in range(x):
-        yield i, identifier
 
 def foo():
     my_tid = yield GetTid()
     for i in range(5):
         yield f'Foo just ran with tid = {my_tid}'
 
+def create_child():
+    child = yield NewTask(foo())
+    yield f'created child task {child}'
+
 
 sched = Scheduler()
 
-sched.new(foo())
+sched.new(create_child())
 
 sched.mainloop()
