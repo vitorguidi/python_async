@@ -40,11 +40,20 @@ class KillTask(SystemCall):
             target_task.sendval = False
         self.sched.schedule(self.task)
 
+class WaitTask(SystemCall):
+    def __init__(self, tid):
+        self.tid = tid
+    def handle(self):
+        result = self.sched.waitforexit(self.task, self.tid)
+        self.task.sendval = result
+        if not result:
+            self.sched.schedule(self.task)
 
 class Scheduler:
     def __init__(self):
         self.ready = []
         self.taskmap = {}
+        self.exit_waiting = {}
         self.time = 0
 
     def new(self, target):
@@ -58,6 +67,15 @@ class Scheduler:
 
     def exit(self, task):
         del self.taskmap[task.tid]
+        for task in self.exit_waiting.pop(task.tid, []):
+            self.schedule(task)
+
+    def waitforexit(self, task, waittid):
+        if waittid in self.taskmap:
+            self.exit_waiting.setdefault(waittid, []).append(task)
+            return True
+        else:
+            return False
 
     def mainloop(self):
         while self.taskmap:
@@ -75,17 +93,19 @@ class Scheduler:
                 print(f'exiting task {task.tid}')
                 self.exit(task)
 
-def foo():
+def foo(n):
     my_tid = yield GetTid()
-    while True:
+    while n > 0:
+        n = n-1
         yield f'Foo just ran with tid = {my_tid}'
 
 def create_and_kill_child():
     my_tid = yield GetTid()
     yield f'create_and_kill_child just ran with tid={my_tid}'
-    child = yield NewTask(foo())
+    child = yield NewTask(foo(10))
     yield f'created child task {child}'
-    yield KillTask(child)
+    yield WaitTask(child)
+    yield f'child {child} finished, exiting now'
 
 
 
