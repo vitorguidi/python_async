@@ -2,6 +2,9 @@ import heapq
 
 from typing import NamedTuple, List
 
+from raft.clock import Clock
+
+
 class SchedulerEntry(NamedTuple):
     time: int
     entry: any
@@ -13,8 +16,9 @@ class SchedulerEntry(NamedTuple):
 
 class Scheduler:
     taskid = 0
-    def __init__(self):
+    def __init__(self, clock: Clock):
         self.pq: List[SchedulerEntry] = []
+        self.clock = clock
 
     def schedule(self, time: int, entry: any):
         heapq.heappush(self.pq, SchedulerEntry(time, entry, Scheduler.taskid))
